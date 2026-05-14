@@ -70,6 +70,9 @@ def stitch_frame_task(task_data):
     if not HAS_OIIO:
         return (False, f"Frame {task_data['frame_num']}", "", "OpenImageIO is not installed.")
         
+    # Limit internal OIIO threads per process to prevent thread explosion & excessive memory alloc
+    oiio.attribute("threads", 1)
+    
     out_path = task_data['output_path']
     frame_num = task_data['frame_num']
     viewports = task_data['viewports']
@@ -106,11 +109,16 @@ def stitch_frame_task(task_data):
                 continue 
             oiio.ImageBufAlgo.paste(master_buf, vp['x'], vp['y'], 0, 0, vp_buf)
             vp_buf.clear()
+            del vp_buf
             
         # Write output
         master_buf.write(out_path)
         master_buf.clear()
         first_buf.clear()
+        
+        # Explicitly delete to force garbage collection of large C++ buffers
+        del master_buf
+        del first_buf
         
         return (True, f"Frame {frame_num}", out_path, "Success")
     except Exception as e:
@@ -123,9 +131,10 @@ class PatchWorker(QThread):
     log_signal = Signal(str)
     finished_signal = Signal()
 
-    def __init__(self, tasks, parent=None):
+    def __init__(self, tasks, max_workers=None, parent=None):
         super().__init__(parent)
         self.tasks = tasks
+        self.max_workers = max_workers
 
     def run(self):
         if not self.tasks:
@@ -140,7 +149,7 @@ class PatchWorker(QThread):
         mode = self.tasks[0].get('mode', 'patch')
         task_func = process_frame_task if mode == 'patch' else stitch_frame_task
         
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {executor.submit(task_func, task): task for task in self.tasks}
             
             for future in concurrent.futures.as_completed(futures):
@@ -180,7 +189,9 @@ class NDisplayPatcherUI(QMainWindow):
         
         self.radio_patch = QRadioButton("Metadata Patch (Fast)")
         self.radio_patch.setChecked(True)
+        self.radio_patch.setToolTip("Modify EXR headers without altering pixel data (Extremely fast).")
         self.radio_stitch = QRadioButton("Full Stitch (OIIO)")
+        self.radio_stitch.setToolTip("Physically merge multiple viewports into a single EXR per frame using OpenImageIO.")
         mode_layout.addWidget(self.radio_patch)
         mode_layout.addWidget(self.radio_stitch)
         
@@ -189,7 +200,17 @@ class NDisplayPatcherUI(QMainWindow):
         self.combo_comp = QComboBox()
         self.combo_comp.addItems(["zip", "dwaa", "none", "rle", "zips", "piz"])
         self.combo_comp.setEnabled(False)
+        self.combo_comp.setToolTip("Select the compression format for the stitched output. 'zip' is lossless, 'dwaa' is lossy and much smaller.")
         mode_layout.addWidget(self.combo_comp)
+        
+        mode_layout.addSpacing(20)
+        mode_layout.addWidget(QLabel("Max Workers:"))
+        self.spin_workers = QSpinBox()
+        self.spin_workers.setRange(1, 64)
+        self.spin_workers.setValue(4)
+        self.spin_workers.setEnabled(False)
+        self.spin_workers.setToolTip("Limit the number of parallel processes to prevent running out of RAM, especially with massive EXRs.")
+        mode_layout.addWidget(self.spin_workers)
         
         mode_layout.addStretch()
         main_layout.addWidget(mode_group)
@@ -202,6 +223,7 @@ class NDisplayPatcherUI(QMainWindow):
         config_layout = QGridLayout(config_group)
         config_layout.addWidget(QLabel("nDisplay Config (.json):"), 0, 0)
         self.json_line = QLineEdit()
+        self.json_line.setToolTip("Path to the .ndisplay configuration JSON file.")
         config_layout.addWidget(self.json_line, 0, 1)
         btn_json = QPushButton("Browse...")
         btn_json.clicked.connect(self.browse_json)
@@ -214,6 +236,7 @@ class NDisplayPatcherUI(QMainWindow):
         
         paths_layout.addWidget(QLabel("Input Folder:"), 0, 0)
         self.input_line = QLineEdit()
+        self.input_line.setToolTip("Directory containing the original raw nDisplay EXR sequence.")
         self.input_line.textChanged.connect(self.on_input_text_changed)
         paths_layout.addWidget(self.input_line, 0, 1)
         btn_input = QPushButton("Browse...")
@@ -221,11 +244,13 @@ class NDisplayPatcherUI(QMainWindow):
         paths_layout.addWidget(btn_input, 0, 2)
         
         self.chk_overwrite = QCheckBox("Overwrite Input Files In-Place")
+        self.chk_overwrite.setToolTip("Patch files directly in the input directory without creating a copy. (Disabled for Full Stitch)")
         self.chk_overwrite.toggled.connect(self.toggle_overwrite)
         paths_layout.addWidget(self.chk_overwrite, 1, 1, 1, 2)
         
         paths_layout.addWidget(QLabel("Output Folder:"), 2, 0)
         self.output_line = QLineEdit()
+        self.output_line.setToolTip("Directory to save the processed sequence.")
         paths_layout.addWidget(self.output_line, 2, 1)
         self.btn_output = QPushButton("Browse...")
         self.btn_output.clicked.connect(self.browse_output)
@@ -240,17 +265,20 @@ class NDisplayPatcherUI(QMainWindow):
         frames_layout.addWidget(QLabel("Start Frame:"))
         self.spin_start = QSpinBox()
         self.spin_start.setRange(0, 9999999)
+        self.spin_start.setToolTip("First frame of the sequence to process.")
         frames_layout.addWidget(self.spin_start)
         
         frames_layout.addWidget(QLabel("End Frame:"))
         self.spin_end = QSpinBox()
         self.spin_end.setRange(0, 9999999)
+        self.spin_end.setToolTip("Last frame of the sequence to process.")
         frames_layout.addWidget(self.spin_end)
         
         frames_layout.addWidget(QLabel("Frame Step:"))
         self.spin_step = QSpinBox()
         self.spin_step.setRange(1, 1000)
         self.spin_step.setValue(1)
+        self.spin_step.setToolTip("Process every Nth frame.")
         frames_layout.addWidget(self.spin_step)
         
         frames_layout.addStretch()
@@ -259,11 +287,13 @@ class NDisplayPatcherUI(QMainWindow):
         # --- Action Buttons ---
         buttons_layout = QHBoxLayout()
         self.btn_analyze = QPushButton("Analyze Sequence")
+        self.btn_analyze.setToolTip("Check if all expected viewports and frames are present before processing.")
         self.btn_analyze.setMinimumHeight(40)
         self.btn_analyze.clicked.connect(self.analyze_sequence)
         buttons_layout.addWidget(self.btn_analyze)
         
         self.btn_process = QPushButton("Process Frames")
+        self.btn_process.setToolTip("Start the patching or stitching operation.")
         self.btn_process.setMinimumHeight(40)
         self.btn_process.clicked.connect(self.start_processing)
         buttons_layout.addWidget(self.btn_process)
@@ -282,6 +312,7 @@ class NDisplayPatcherUI(QMainWindow):
     def on_mode_changed(self):
         is_stitch = self.radio_stitch.isChecked()
         self.combo_comp.setEnabled(is_stitch)
+        self.spin_workers.setEnabled(is_stitch)
         
         if is_stitch:
             self.chk_overwrite.setChecked(False)
@@ -610,7 +641,8 @@ class NDisplayPatcherUI(QMainWindow):
         self.progress_bar.setMaximum(len(tasks))
         self.progress_bar.setValue(0)
         
-        self.worker = PatchWorker(tasks)
+        max_workers = self.spin_workers.value()
+        self.worker = PatchWorker(tasks, max_workers=max_workers)
         self.worker.progress_signal.connect(self.update_progress)
         self.worker.log_signal.connect(self.log)
         self.worker.finished_signal.connect(self.processing_finished)
