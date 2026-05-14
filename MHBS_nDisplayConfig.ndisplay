@@ -1,0 +1,756 @@
+{
+	"nDisplay":
+	{
+		"description": "",
+		"version": "5.00",
+		"assetPath": "/Game/setData/MHBS_nDisplayConfig.MHBS_nDisplayConfig",
+		"misc":
+		{
+			"bFollowLocalPlayerCamera": false,
+			"bExitOnEsc": true,
+			"bOverrideViewportsFromExternalConfig": false,
+			"bOverrideTransformsFromExternalConfig": false,
+			"clusterOuterViewportsBufferRatio": 0.6600000262260437
+		},
+		"scene":
+		{
+			"xforms":
+			{
+			},
+			"cameras":
+			{
+				"DefaultViewPoint":
+				{
+					"interpupillaryDistance": 6.4000000953674316,
+					"swapEyes": false,
+					"stereoOffset": "none",
+					"parentId": "",
+					"location":
+					{
+						"x": -362.50173950195312,
+						"y": -5.6843418860808015e-14,
+						"z": 93.862136840820312
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				}
+			},
+			"screens":
+			{
+				"Ruby":
+				{
+					"size":
+					{
+						"width": 500,
+						"height": 300
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -4.5474735088646412e-13,
+						"y": -2.1149196527403546e-07,
+						"z": 165
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_1":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": -225,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_2":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": -175,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_3":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": -125,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_4":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": -75,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_5":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": -25,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_6":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": 25,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_7":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": 75,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_8":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": 125,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_9":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": 175,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				},
+				"Spark_T_10":
+				{
+					"size":
+					{
+						"width": 6,
+						"height": 100
+					},
+					"parentId": "",
+					"location":
+					{
+						"x": -2.2737367544323206e-13,
+						"y": 225,
+						"z": 370
+					},
+					"rotation":
+					{
+						"pitch": 0,
+						"yaw": 0,
+						"roll": 0
+					}
+				}
+			}
+		},
+		"cluster":
+		{
+			"primaryNode":
+			{
+				"id": "Node_0",
+				"ports":
+				{
+					"ClusterSync": 41001,
+					"ClusterEventsJson": 41003,
+					"ClusterEventsBinary": 41004
+				}
+			},
+			"sync":
+			{
+				"renderSyncPolicy":
+				{
+					"type": "nvidia",
+					"parameters":
+					{
+					}
+				},
+				"inputSyncPolicy":
+				{
+					"type": "ReplicatePrimary",
+					"parameters":
+					{
+					}
+				}
+			},
+			"network":
+			{
+				"ConnectRetriesAmount": "300",
+				"ConnectRetryDelay": "1000",
+				"GameStartBarrierTimeout": "3600000",
+				"FrameStartBarrierTimeout": "1800000",
+				"FrameEndBarrierTimeout": "1800000",
+				"RenderSyncBarrierTimeout": "1800000"
+			},
+			"failover":
+			{
+				"bEnabled": false,
+				"primaryBackups": [],
+				"criticalNodes": []
+			},
+			"nodes":
+			{
+				"Node_0":
+				{
+					"host": "127.0.0.1",
+					"sound": false,
+					"fullScreen": false,
+					"renderHeadless": false,
+					"graphicsAdapter": -1,
+					"textureShare": false,
+					"window":
+					{
+						"x": 0,
+						"y": 0,
+						"w": 3840,
+						"h": 2160
+					},
+					"postprocess":
+					{
+					},
+					"viewports":
+					{
+						"VP_0":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 0,
+								"y": 0,
+								"w": 2160,
+								"h": 1296
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Ruby"
+								}
+							}
+						}
+					},
+					"outputRemap":
+					{
+						"bEnable": false,
+						"dataSource": "mesh",
+						"staticMeshAsset": "",
+						"externalFile": ""
+					}
+				},
+				"Spark":
+				{
+					"host": "127.0.0.1",
+					"sound": false,
+					"fullScreen": false,
+					"renderHeadless": false,
+					"graphicsAdapter": -1,
+					"textureShare": false,
+					"window":
+					{
+						"x": 3840,
+						"y": 0,
+						"w": 3840,
+						"h": 2160
+					},
+					"postprocess":
+					{
+					},
+					"viewports":
+					{
+						"Spark_T_1":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 0,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_1"
+								}
+							}
+						},
+						"Spark_T_6":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 30,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_6"
+								}
+							}
+						},
+						"Spark_T_5":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 24,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_5"
+								}
+							}
+						},
+						"Spark_T_4":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 18,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_4"
+								}
+							}
+						},
+						"Spark_T_3":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 12,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_3"
+								}
+							}
+						},
+						"Spark_T_2":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 6,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_2"
+								}
+							}
+						},
+						"Spark_T_7":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 36,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_7"
+								}
+							}
+						},
+						"Spark_T_8":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 42,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_8"
+								}
+							}
+						},
+						"Spark_T_9":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 48,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_9"
+								}
+							}
+						},
+						"Spark_T_10":
+						{
+							"camera": "",
+							"bufferRatio": 1,
+							"gPUIndex": -1,
+							"allowCrossGPUTransfer": false,
+							"isShared": false,
+							"overscan":
+							{
+								"bEnabled": false,
+								"mode": "percent",
+								"left": 0,
+								"right": 0,
+								"top": 0,
+								"bottom": 0,
+								"oversize": true
+							},
+							"region":
+							{
+								"x": 54,
+								"y": 0,
+								"w": 6,
+								"h": 120
+							},
+							"projectionPolicy":
+							{
+								"type": "simple",
+								"parameters":
+								{
+									"screen": "Spark_T_10"
+								}
+							}
+						}
+					},
+					"outputRemap":
+					{
+						"bEnable": false,
+						"dataSource": "mesh",
+						"staticMeshAsset": "",
+						"externalFile": ""
+					}
+				}
+			}
+		},
+		"customParameters":
+		{
+		},
+		"diagnostics":
+		{
+			"simulateLag": false,
+			"minLagTime": 0.0099999997764825821,
+			"maxLagTime": 0.30000001192092896
+		}
+	}
+}
