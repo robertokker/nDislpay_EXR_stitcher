@@ -9,16 +9,21 @@ import traceback
 import OpenEXR
 import Imath
 
+try:
+    import OpenImageIO as oiio
+    HAS_OIIO = True
+except ImportError:
+    HAS_OIIO = False
+
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFileDialog, QSpinBox,
     QTextEdit, QProgressBar, QMessageBox, QGroupBox, QGridLayout,
-    QCheckBox
+    QCheckBox, QRadioButton, QComboBox
 )
 from PySide6.QtCore import Qt, QThread, Signal
 
-# --- Multiprocessing Function ---
-# This must be at the module level for ProcessPoolExecutor to pickle it on Windows.
+# --- Multiprocessing Functions ---
 
 def _box2i_from_tuple(b_tuple):
     """Convert (x_min, y_min, x_max, y_max) to Imath.Box2i"""
@@ -29,13 +34,7 @@ def _box2i_from_tuple(b_tuple):
 
 def process_frame_task(task_data):
     """
-    Task function executed in a separate process.
-    task_data is a dict with:
-      - input_path: str
-      - output_path: str
-      - display_window: (x_min, y_min, x_max, y_max)
-      - data_window: (x_min, y_min, x_max, y_max)
-      - viewport: str
+    Metadata Patch task function executed in a separate process.
     """
     in_path = task_data['input_path']
     out_path = task_data['output_path']
@@ -44,20 +43,15 @@ def process_frame_task(task_data):
     viewport = task_data['viewport']
 
     try:
-        # Load input EXR
         in_file = OpenEXR.InputFile(in_path)
         header = in_file.header()
         
-        # Modify window headers
         header['displayWindow'] = _box2i_from_tuple(display_win_tuple)
         header['dataWindow'] = _box2i_from_tuple(data_win_tuple)
         
-        # Read channels
         channels = header['channels'].keys()
         pixel_data = in_file.channels(channels)
         
-        # Write output EXR with patched header (writes to temp file if overwriting same file?
-        # OpenEXR usually overwrites cleanly if file is opened for output after input is closed.
         in_file.close()
         
         out_file = OpenEXR.OutputFile(out_path, header)
@@ -68,6 +62,59 @@ def process_frame_task(task_data):
         return (True, viewport, in_path, "Success")
     except Exception as e:
         return (False, viewport, in_path, str(e))
+
+def stitch_frame_task(task_data):
+    """
+    OpenImageIO Stitch task function executed in a separate process.
+    """
+    if not HAS_OIIO:
+        return (False, f"Frame {task_data['frame_num']}", "", "OpenImageIO is not installed.")
+        
+    out_path = task_data['output_path']
+    frame_num = task_data['frame_num']
+    viewports = task_data['viewports']
+    
+    try:
+        # Open first file to inherit spec
+        first_vp = viewports[0]
+        first_buf = oiio.ImageBuf(first_vp['filepath'])
+        if first_buf.has_error:
+            return (False, f"Frame {frame_num}", "", f"Error reading {first_vp['filepath']}: {first_buf.geterror()}")
+            
+        spec = first_buf.spec()
+        
+        # Modify spec for master canvas
+        spec.width = task_data['global_w']
+        spec.height = task_data['global_h']
+        spec.full_width = task_data['global_w']
+        spec.full_height = task_data['global_h']
+        spec.x = 0
+        spec.y = 0
+        spec.full_x = 0
+        spec.full_y = 0
+        
+        if task_data['compression'] != "none":
+            spec.attribute("compression", task_data['compression'])
+            
+        # Initialize Master Buffer
+        master_buf = oiio.ImageBuf(spec)
+        
+        # Paste viewports
+        for vp in viewports:
+            vp_buf = oiio.ImageBuf(vp['filepath'])
+            if vp_buf.has_error:
+                continue 
+            oiio.ImageBufAlgo.paste(master_buf, vp['x'], vp['y'], 0, 0, vp_buf)
+            vp_buf.clear()
+            
+        # Write output
+        master_buf.write(out_path)
+        master_buf.clear()
+        first_buf.clear()
+        
+        return (True, f"Frame {frame_num}", out_path, "Success")
+    except Exception as e:
+        return (False, f"Frame {frame_num}", "", str(e))
 
 # --- Worker Thread for UI ---
 
@@ -81,23 +128,29 @@ class PatchWorker(QThread):
         self.tasks = tasks
 
     def run(self):
+        if not self.tasks:
+            self.finished_signal.emit()
+            return
+            
         total_tasks = len(self.tasks)
-        self.log_signal.emit(f"Starting to process {total_tasks} frames...")
+        self.log_signal.emit(f"Starting to process {total_tasks} jobs...")
         
         completed = 0
         
-        # Use ProcessPoolExecutor for CPU-bound EXR processing
+        mode = self.tasks[0].get('mode', 'patch')
+        task_func = process_frame_task if mode == 'patch' else stitch_frame_task
+        
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            futures = {executor.submit(process_frame_task, task): task for task in self.tasks}
+            futures = {executor.submit(task_func, task): task for task in self.tasks}
             
             for future in concurrent.futures.as_completed(futures):
-                success, viewport, filepath, msg = future.result()
+                success, identifier, filepath, msg = future.result()
                 filename = os.path.basename(filepath)
                 
                 if success:
-                    self.log_signal.emit(f"[OK] [{viewport}] {filename}")
+                    self.log_signal.emit(f"[OK] [{identifier}] {filename}")
                 else:
-                    self.log_signal.emit(f"[ERROR] [{viewport}] {filename} - {msg}")
+                    self.log_signal.emit(f"[ERROR] [{identifier}] {filename} - {msg}")
                 
                 completed += 1
                 self.progress_signal.emit(completed, total_tasks)
@@ -110,8 +163,8 @@ class PatchWorker(QThread):
 class NDisplayPatcherUI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("nDisplay EXR Metadata Patcher")
-        self.resize(750, 600)
+        self.setWindowTitle("nDisplay EXR Utility")
+        self.resize(750, 650)
         
         self.worker = None
         self.setup_ui()
@@ -121,11 +174,44 @@ class NDisplayPatcherUI(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         
+        # --- Mode Group ---
+        mode_group = QGroupBox("Processing Mode")
+        mode_layout = QHBoxLayout(mode_group)
+        
+        self.radio_patch = QRadioButton("Metadata Patch (Fast)")
+        self.radio_patch.setChecked(True)
+        self.radio_stitch = QRadioButton("Full Stitch (OIIO)")
+        mode_layout.addWidget(self.radio_patch)
+        mode_layout.addWidget(self.radio_stitch)
+        
+        mode_layout.addSpacing(20)
+        mode_layout.addWidget(QLabel("Stitch Compression:"))
+        self.combo_comp = QComboBox()
+        self.combo_comp.addItems(["zip", "dwaa", "none", "rle", "zips", "piz"])
+        self.combo_comp.setEnabled(False)
+        mode_layout.addWidget(self.combo_comp)
+        
+        mode_layout.addStretch()
+        main_layout.addWidget(mode_group)
+        
+        self.radio_patch.toggled.connect(self.on_mode_changed)
+        self.radio_stitch.toggled.connect(self.on_mode_changed)
+        
+        # --- Config Group ---
+        config_group = QGroupBox("Configuration")
+        config_layout = QGridLayout(config_group)
+        config_layout.addWidget(QLabel("nDisplay Config (.json):"), 0, 0)
+        self.json_line = QLineEdit()
+        config_layout.addWidget(self.json_line, 0, 1)
+        btn_json = QPushButton("Browse...")
+        btn_json.clicked.connect(self.browse_json)
+        config_layout.addWidget(btn_json, 0, 2)
+        main_layout.addWidget(config_group)
+        
         # --- Paths Group ---
         paths_group = QGroupBox("Paths")
         paths_layout = QGridLayout(paths_group)
         
-        # Input Folder
         paths_layout.addWidget(QLabel("Input Folder:"), 0, 0)
         self.input_line = QLineEdit()
         self.input_line.textChanged.connect(self.on_input_text_changed)
@@ -134,26 +220,16 @@ class NDisplayPatcherUI(QMainWindow):
         btn_input.clicked.connect(self.browse_input)
         paths_layout.addWidget(btn_input, 0, 2)
         
-        # JSON Config
-        paths_layout.addWidget(QLabel("nDisplay Config (.json):"), 1, 0)
-        self.json_line = QLineEdit()
-        paths_layout.addWidget(self.json_line, 1, 1)
-        btn_json = QPushButton("Browse...")
-        btn_json.clicked.connect(self.browse_json)
-        paths_layout.addWidget(btn_json, 1, 2)
-        
-        # Overwrite Checkbox
         self.chk_overwrite = QCheckBox("Overwrite Input Files In-Place")
         self.chk_overwrite.toggled.connect(self.toggle_overwrite)
-        paths_layout.addWidget(self.chk_overwrite, 2, 1, 1, 2)
+        paths_layout.addWidget(self.chk_overwrite, 1, 1, 1, 2)
         
-        # Output Folder
-        paths_layout.addWidget(QLabel("Output Folder:"), 3, 0)
+        paths_layout.addWidget(QLabel("Output Folder:"), 2, 0)
         self.output_line = QLineEdit()
-        paths_layout.addWidget(self.output_line, 3, 1)
+        paths_layout.addWidget(self.output_line, 2, 1)
         self.btn_output = QPushButton("Browse...")
         self.btn_output.clicked.connect(self.browse_output)
-        paths_layout.addWidget(self.btn_output, 3, 2)
+        paths_layout.addWidget(self.btn_output, 2, 2)
         
         main_layout.addWidget(paths_group)
         
@@ -164,13 +240,11 @@ class NDisplayPatcherUI(QMainWindow):
         frames_layout.addWidget(QLabel("Start Frame:"))
         self.spin_start = QSpinBox()
         self.spin_start.setRange(0, 9999999)
-        self.spin_start.setValue(0)
         frames_layout.addWidget(self.spin_start)
         
         frames_layout.addWidget(QLabel("End Frame:"))
         self.spin_end = QSpinBox()
         self.spin_end.setRange(0, 9999999)
-        self.spin_end.setValue(1000)
         frames_layout.addWidget(self.spin_end)
         
         frames_layout.addWidget(QLabel("Frame Step:"))
@@ -205,9 +279,23 @@ class NDisplayPatcherUI(QMainWindow):
         self.progress_bar.setValue(0)
         main_layout.addWidget(self.progress_bar)
 
+    def on_mode_changed(self):
+        is_stitch = self.radio_stitch.isChecked()
+        self.combo_comp.setEnabled(is_stitch)
+        
+        if is_stitch:
+            self.chk_overwrite.setChecked(False)
+            self.chk_overwrite.setEnabled(False)
+            self.output_line.setEnabled(True)
+            self.btn_output.setEnabled(True)
+        else:
+            self.chk_overwrite.setEnabled(True)
+            self.toggle_overwrite(self.chk_overwrite.isChecked())
+
     def toggle_overwrite(self, checked):
-        self.output_line.setEnabled(not checked)
-        self.btn_output.setEnabled(not checked)
+        if not self.radio_stitch.isChecked():
+            self.output_line.setEnabled(not checked)
+            self.btn_output.setEnabled(not checked)
 
     def browse_input(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Input Folder")
@@ -235,7 +323,7 @@ class NDisplayPatcherUI(QMainWindow):
                 self.spin_end.setValue(max_f)
                 self.log(f"Auto-detected frame range: {min_f} - {max_f}")
         except Exception as e:
-            pass # Ignore errors if path is partially typed
+            pass 
 
     def browse_output(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Folder")
@@ -251,7 +339,6 @@ class NDisplayPatcherUI(QMainWindow):
         self.log_text.append(message)
 
     def find_key_recursive(self, data, target_key):
-        """Recursively search for a key in a nested dictionary/list structure."""
         if isinstance(data, dict):
             if target_key in data:
                 return data[target_key]
@@ -270,38 +357,31 @@ class NDisplayPatcherUI(QMainWindow):
         json_path = self.json_line.text().strip()
         if not os.path.exists(json_path):
             QMessageBox.warning(self, "Invalid Path", "nDisplay Config file does not exist.")
-            return None, None, None
+            return None
             
         try:
             with open(json_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
         except Exception as e:
             QMessageBox.critical(self, "JSON Error", f"Failed to read JSON: {e}")
-            return None, None, None
+            return None
             
         cluster = self.find_key_recursive(config_data, 'cluster')
         if not cluster:
             QMessageBox.critical(self, "Config Error", "Could not find 'cluster' section in JSON.")
-            return None, None, None
+            return None
             
         nodes = cluster.get('nodes', {})
         if not nodes:
             QMessageBox.critical(self, "Config Error", "Could not find 'nodes' section in JSON.")
-            return None, None, None
+            return None
 
-        global_w, global_h = 0, 0
-        for node_name, node_data in nodes.items():
-            if 'window' in node_data:
-                win = node_data['window']
-                global_w = max(global_w, int(win.get('w', 0)))
-                global_h = max(global_h, int(win.get('h', 0)))
-                
-        if global_w == 0 or global_h == 0:
-            QMessageBox.critical(self, "Config Error", "Could not determine global window size from 'nodes'.")
-            return None, None, None
-            
         viewport_data = {}
         for node_name, node_data in nodes.items():
+            win = node_data.get('window', {})
+            node_w = int(win.get('w', 0))
+            node_h = int(win.get('h', 0))
+            
             viewports = node_data.get('viewports', {})
             for vp_name, vp_info in viewports.items():
                 if 'region' in vp_info:
@@ -310,14 +390,17 @@ class NDisplayPatcherUI(QMainWindow):
                         'x': int(reg.get('x', 0)),
                         'y': int(reg.get('y', 0)),
                         'w': int(reg.get('w', 0)),
-                        'h': int(reg.get('h', 0))
+                        'h': int(reg.get('h', 0)),
+                        'node_name': node_name,
+                        'node_w': node_w,
+                        'node_h': node_h
                     }
                     
         if not viewport_data:
             QMessageBox.critical(self, "Config Error", "No valid viewports with 'region' found in JSON.")
-            return None, None, None
+            return None
             
-        return global_w, global_h, viewport_data
+        return viewport_data
 
     def scan_tasks(self, in_folder, viewport_data, start_frame, end_frame, step):
         files = os.listdir(in_folder)
@@ -357,7 +440,7 @@ class NDisplayPatcherUI(QMainWindow):
             QMessageBox.warning(self, "Invalid Path", "Input folder does not exist.")
             return False
 
-        global_w, global_h, viewport_data = self.get_config_viewports()
+        viewport_data = self.get_config_viewports()
         if not viewport_data:
             return False
             
@@ -401,7 +484,7 @@ class NDisplayPatcherUI(QMainWindow):
         elif not missing_vps:
             self.log("[OK] All viewports have complete frame ranges.")
             
-        self.log(f"Analysis complete. Found {len(found_files)} total frames to process.")
+        self.log(f"Analysis complete. Found {len(found_files)} total files.")
         self.log("------------------------")
         
         if has_warnings:
@@ -418,27 +501,29 @@ class NDisplayPatcherUI(QMainWindow):
     def start_processing(self):
         in_folder = self.input_line.text().strip()
         out_folder = self.output_line.text().strip()
-        is_overwrite = self.chk_overwrite.isChecked()
+        is_stitch = self.radio_stitch.isChecked()
+        is_overwrite = self.chk_overwrite.isChecked() and not is_stitch
         
+        if is_stitch and not HAS_OIIO:
+            QMessageBox.critical(self, "Missing Dependency", "OpenImageIO is not installed. Please run 'pip install OpenImageIO' to use Full Stitch mode.")
+            return
+
         if not is_overwrite and not out_folder:
-            QMessageBox.warning(self, "Missing Fields", "Please specify an Output Folder, or check 'Overwrite Input Files'.")
+            QMessageBox.warning(self, "Missing Fields", "Please specify an Output Folder.")
             return
             
         if not os.path.exists(in_folder):
             QMessageBox.warning(self, "Invalid Path", "Input folder does not exist.")
             return
+
+        if is_stitch and os.path.normpath(in_folder) == os.path.normpath(out_folder):
+            QMessageBox.critical(self, "Invalid Path", "Input and Output folders must be DIFFERENT for Full Stitch Mode to avoid overwriting raw renders.")
+            return
             
-        # Optional: Run analyze check automatically if the user just clicks Process
-        # We'll skip automatic analysis popup here so they can bypass it if they want,
-        # but if no frames are found, it will warn them below.
-        
-        global_w, global_h, viewport_data = self.get_config_viewports()
+        viewport_data = self.get_config_viewports()
         if not viewport_data:
             return
             
-        self.log(f"Global Canvas Size: {global_w} x {global_h}")
-        display_win_tuple = (0, 0, global_w - 1, global_h - 1)
-        
         start_frame = self.spin_start.value()
         end_frame = self.spin_end.value()
         step = self.spin_step.value()
@@ -455,35 +540,76 @@ class NDisplayPatcherUI(QMainWindow):
             out_folder = in_folder
             
         tasks = []
-        for f, vp, frame_num in found_files:
-            vp_info = viewport_data[vp]
-            data_win_tuple = (
-                vp_info['x'],
-                vp_info['y'],
-                vp_info['x'] + vp_info['w'] - 1,
-                vp_info['y'] + vp_info['h'] - 1
-            )
-            
-            in_path = os.path.join(in_folder, f)
-            out_path = os.path.join(out_folder, f)
-            
-            tasks.append({
-                'input_path': in_path,
-                'output_path': out_path,
-                'display_window': display_win_tuple,
-                'data_window': data_win_tuple,
-                'viewport': vp
-            })
-            
-        self.log(f"Starting processing of {len(tasks)} frames...")
         
-        # Setup UI for processing
+        if is_stitch:
+            frames_dict = {}
+            for f, vp, frame_num in found_files:
+                node_name = viewport_data[vp]['node_name']
+                key = (frame_num, node_name)
+                if key not in frames_dict:
+                    frames_dict[key] = []
+                frames_dict[key].append((f, vp))
+                
+            for (frame_num, node_name), files_list in frames_dict.items():
+                vps_list = []
+                node_w = viewport_data[files_list[0][1]]['node_w']
+                node_h = viewport_data[files_list[0][1]]['node_h']
+                for f, vp in files_list:
+                    vp_info = viewport_data[vp]
+                    vps_list.append({
+                        'filepath': os.path.join(in_folder, f),
+                        'viewport': vp,
+                        'x': vp_info['x'],
+                        'y': vp_info['y']
+                    })
+                
+                first_f = files_list[0][0]
+                first_vp = files_list[0][1]
+                stitched_name = first_f.replace(f"_{first_vp}", f"_{node_name}")
+                if stitched_name == first_f:
+                    stitched_name = first_f.replace(first_vp, f"Stitched_{node_name}")
+                
+                out_path = os.path.join(out_folder, stitched_name)
+                
+                tasks.append({
+                    'mode': 'stitch',
+                    'frame_num': frame_num,
+                    'output_path': out_path,
+                    'viewports': vps_list,
+                    'global_w': node_w,
+                    'global_h': node_h,
+                    'compression': self.combo_comp.currentText()
+                })
+        else:
+            for f, vp, frame_num in found_files:
+                vp_info = viewport_data[vp]
+                display_win_tuple = (0, 0, vp_info['node_w'] - 1, vp_info['node_h'] - 1)
+                data_win_tuple = (
+                    vp_info['x'],
+                    vp_info['y'],
+                    vp_info['x'] + vp_info['w'] - 1,
+                    vp_info['y'] + vp_info['h'] - 1
+                )
+                
+                in_path = os.path.join(in_folder, f)
+                out_path = os.path.join(out_folder, f)
+                
+                tasks.append({
+                    'mode': 'patch',
+                    'input_path': in_path,
+                    'output_path': out_path,
+                    'display_window': display_win_tuple,
+                    'data_window': data_win_tuple,
+                    'viewport': vp
+                })
+            
+        self.log(f"Starting processing of {len(tasks)} jobs...")
+        
         self.btn_process.setEnabled(False)
         self.btn_analyze.setEnabled(False)
         self.progress_bar.setMaximum(len(tasks))
         self.progress_bar.setValue(0)
         
-        # Start background worker
         self.worker = PatchWorker(tasks)
         self.worker.progress_signal.connect(self.update_progress)
         self.worker.log_signal.connect(self.log)
@@ -496,7 +622,7 @@ class NDisplayPatcherUI(QMainWindow):
     def processing_finished(self):
         self.btn_process.setEnabled(True)
         self.btn_analyze.setEnabled(True)
-        QMessageBox.information(self, "Complete", "EXR Patching completed.")
+        QMessageBox.information(self, "Complete", "Processing completed.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
